@@ -146,6 +146,86 @@
         .metric-value { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
         .metric-label { font-size: 0.85rem; color: var(--muted); }
 
+        .content-columns {
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 2rem;
+        }
+
+        .news-column {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .extra-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background: var(--bg); 
+            border-radius: 12px;
+            padding: 1.5rem; 
+            border: 1px solid var(--border);
+        }
+
+        .panel-title {
+            font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;
+            color: var(--text); display: flex; align-items: center; gap: 0.5rem;
+        }
+
+        .news-item {
+            margin-bottom: 1rem; padding: 1rem; background: var(--card);
+            border-radius: 8px; border: 1px solid var(--border);
+        }
+
+        .news-item a {
+            color: var(--accent); text-decoration: none; font-weight: 600;
+            display: block; margin-bottom: 0.5rem;
+        }
+
+        .news-item a:hover { text-decoration: underline; }
+
+        .tech-indicator {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.75rem 0; border-bottom: 1px solid var(--border);
+        }
+
+        .tech-indicator:last-child { border-bottom: none; }
+
+        .indicator-name { font-weight: 600; color: var(--text); }
+        .indicator-value { font-weight: 700; }
+        .indicator-value.bullish { color: var(--positive); }
+        .indicator-value.bearish { color: var(--negative); }
+        .indicator-value.neutral { color: var(--muted); }
+
+        .price-target {
+            text-align: center; padding: 1.5rem;
+            background: linear-gradient(135deg, var(--accent), var(--positive));
+            color: white; border-radius: 12px; margin-top: 1rem;
+        }
+
+        .target-price { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+        .target-change { font-size: 1rem; opacity: 0.9; }
+        
+        .loading { text-align: center; color: var(--muted); padding: 3rem; }
+        .hidden { display: none !important; }
+        
+        .close-button {
+            background: var(--accent); color: white; border: none;
+            padding: 0.75rem 1.5rem; border-radius: 8px; cursor: pointer;
+            font-weight: 600; align-self: flex-end;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 1rem; }
+            .asset-grid { grid-template-columns: 1fr; }
+            .content-columns { 
+                grid-template-columns: 1fr; 
+            }
+            .modal-content { 
+                padding: 1.5rem; 
+            }
+        }
     </style>
 </head>
 <body>
