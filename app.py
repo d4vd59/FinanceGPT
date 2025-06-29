@@ -6,7 +6,11 @@ import time
 import random
 import requests
 import json
+import os
 import nltk
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
     nltk.data.find('vader_lexicon')
@@ -191,7 +195,7 @@ class MarketDataCollector:
 
 class GroqStockPredictor:
     def __init__(self):
-        self.api_key = "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"
+        self.api_key = os.getenv('GROQ_API_KEY')
         self.api_url = "https://api.groq.com/openai/v1/chat/completions"
         self.model = "llama-3.3-70b-versatile"
         
