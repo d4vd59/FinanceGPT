@@ -4,9 +4,9 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 import random
+import requests
+import json
 import nltk
-from textblob import TextBlob
-from nltk.sentiment import SentimentIntensityAnalyzer
 
 try:
     nltk.data.find('vader_lexicon')
@@ -188,3 +188,152 @@ class MarketDataCollector:
             'WFC': 'wellsfargo.com', 'SAP': 'sap.com', 'ABBV': 'abbvie.com'
         }
         return domain_mapping.get(symbol, None)
+
+class GroqStockPredictor:
+    def __init__(self):
+        self.api_key = "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"
+        self.api_url = "https://api.groq.com/openai/v1/chat/completions"
+        self.model = "llama-3.3-70b-versatile"
+        
+        self.prediction_cache = {}
+        self.cache_duration = 3600
+    
+    def is_cache_valid(self, cache_time):
+        if cache_time is None:
+            return False
+        return (datetime.now() - cache_time).total_seconds() < self.cache_duration
+    
+    def get_ai_prediction(self, symbol):
+        try:
+            cache_key = f"groq_{symbol}"
+            if cache_key in self.prediction_cache:
+                cached_pred, cache_time = self.prediction_cache[cache_key]
+                if self.is_cache_valid(cache_time):
+                    print(f"✅ Using cached Groq prediction for {symbol}")
+                    return cached_pred
+    
+            context = self.get_stock_context(symbol)
+            if not context:
+                return None
+            
+            trend_direction = "bullish" if context['change_7d'] > 2 else "bearish" if context['change_7d'] < -2 else "neutral"
+            volatility = "high" if abs(context['change_7d']) > 5 else "low" if abs(context['change_7d']) < 1 else "medium"
+            
+            prompt = f"""You are a professional stock analyst. Analyze {symbol} based on the following data:
+
+Current Price: ${context['current_price']}
+7-day change: {context['change_7d']}%
+30-day change: {context['change_30d']}%
+Recent trend: {trend_direction}
+Volatility: {volatility}
+
+Provide a realistic analysis. Consider:
+- If 7-day change is very negative (< -5%), lean toward bearish/sell
+- If 7-day change is very positive (> 5%), consider if it's overextended
+- If change is moderate, provide balanced view
+- Price targets should reflect realistic expectations, not always growth
+
+Respond with ONLY this JSON format (replace values with your analysis):
+{{
+    "price_target_7d": [calculate realistic 7-day target],
+    "price_target_30d": [calculate realistic 30-day target],
+    "confidence_7d": [1-100 based on data quality],
+    "confidence_30d": [1-100 based on uncertainty],
+    "direction": "[bullish/bearish/neutral based on analysis]",
+    "risk_level": "[low/medium/high based on volatility]",
+    "recommendation": "[buy/sell/hold based on analysis]",
+    "key_factors": ["factor1", "factor2", "factor3"],
+    "reasoning": "Your analytical reasoning here"
+}}"""
+        
+            data = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": "You are an expert financial analyst. Always respond with valid JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.3,
+                "max_tokens": 500
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    print(f"🤖 Asking Groq AI about {symbol} (attempt {attempt + 1}/{max_retries})...")
+                    
+                    timeout = 15 + (attempt * 10)
+                    response = requests.post(self.api_url, json=data, headers=headers, timeout=timeout)
+                    
+                    if response.status_code == 200:
+                        response_json = response.json()
+                        
+                        if "choices" in response_json and len(response_json["choices"]) > 0:
+                            ai_response = response_json["choices"][0]["message"]["content"]
+                            
+                            try:
+                                prediction = json.loads(ai_response)
+                                
+                                prediction.update({
+                                    'symbol': symbol,
+                                    'current_price': context['current_price'],
+                                    'timestamp': datetime.now().isoformat(),
+                                    'ai_model': self.model,
+                                    'powered_by': 'Groq AI'
+                                })
+                                
+                                self.prediction_cache[cache_key] = (prediction, datetime.now())
+                                
+                                print(f"✅ Groq AI prediction for {symbol}: {prediction['direction']}")
+                                return prediction
+                                
+                            except json.JSONDecodeError as e:
+                                print(f"❌ JSON parsing error: {e}")
+                                if attempt == max_retries - 1:
+                                    return None
+                                continue
+                        else:
+                            print("❌ No valid response from Groq")
+                            if attempt == max_retries - 1:
+                                return None
+                            continue
+                            
+                    elif response.status_code == 429:
+                        print(f"⏳ Rate limited - waiting {5 * (attempt + 1)} seconds...")
+                        time.sleep(5 * (attempt + 1))
+                        continue
+                        
+                    else:
+                        print(f"❌ Groq API Error: {response.status_code}")
+                        if attempt == max_retries - 1:
+                            return None
+                        continue
+                        
+                except requests.exceptions.Timeout:
+                    print(f"⏰ Timeout on attempt {attempt + 1}/{max_retries}")
+                    if attempt < max_retries - 1:
+                        wait_time = 2 ** attempt
+                        print(f"⏳ Waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        print("❌ All retry attempts failed due to timeout")
+                        return None
+                        
+                except requests.exceptions.ConnectionError:
+                    print(f"🌐 Connection error on attempt {attempt + 1}/{max_retries}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2 ** attempt)
+                        continue
+                    else:
+                        return None
+                    
+            return None
+            
+        except Exception as e:
+            print(f"❌ Groq prediction error: {e}")
+            return None
