@@ -6,8 +6,10 @@ import time
 import random
 import requests
 import json
-import os
 import nltk
+import os
+from textblob import TextBlob
+from nltk.sentiment import SentimentIntensityAnalyzer
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -231,6 +233,9 @@ Current Price: ${context['current_price']}
 Recent trend: {trend_direction}
 Volatility: {volatility}
 
+"Consider that recent market volatility may be due to external factors rather than fundamental weakness"
+"Distinguish between temporary market shocks and underlying asset fundamentals"
+
 Provide a realistic analysis. Consider:
 - If 7-day change is very negative (< -5%), lean toward bearish/sell
 - If 7-day change is very positive (> 5%), consider if it's overextended
@@ -340,4 +345,28 @@ Respond with ONLY this JSON format (replace values with your analysis):
             
         except Exception as e:
             print(f"❌ Groq prediction error: {e}")
+            return None
+    
+    def get_stock_context(self, symbol):
+        try:
+            ticker = yf.Ticker(symbol)
+            hist = ticker.history(period="1mo")
+            if len(hist) == 0:
+                return None
+                
+            current_price = hist['Close'].iloc[-1]
+            price_7d_ago = hist['Close'].iloc[-7] if len(hist) >= 7 else current_price
+            price_30d_ago = hist['Close'].iloc[0]
+            
+            change_7d = ((current_price - price_7d_ago) / price_7d_ago) * 100
+            change_30d = ((current_price - price_30d_ago) / price_30d_ago) * 100
+            
+            return {
+                'symbol': symbol,
+                'current_price': round(current_price, 2),
+                'change_7d': round(change_7d, 2),
+                'change_30d': round(change_30d, 2)
+            }
+            
+        except Exception as e:
             return None
