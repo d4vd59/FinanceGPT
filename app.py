@@ -370,3 +370,159 @@ Respond with ONLY this JSON format (replace values with your analysis):
             
         except Exception as e:
             return None
+
+class NewsAnalyzer:
+    def __init__(self):
+        self.news_api_key = os.getenv('NEWS_API_KEY')
+    
+    def get_stock_news(self, symbol):
+        try:
+            print(f"📰 Fetching news for {symbol}...")
+            
+            company_name = self.get_company_name(symbol)
+            
+            articles = self.try_news_api(symbol, company_name)
+            if articles:
+                return articles
+            
+            articles = self.try_alpha_vantage_news(symbol, company_name)
+            if articles:
+                return articles
+            
+            articles = self.try_yahoo_rss(symbol, company_name)
+            if articles:
+                return articles
+            
+            articles = self.get_sample_articles(symbol, company_name)
+            return articles
+            
+        except Exception as e:
+            print(f"❌ News error: {e}")
+            return self.get_sample_articles(symbol, self.get_company_name(symbol))
+
+    def try_news_api(self, symbol, company_name):
+        try:
+            url = f"https://newsapi.org/v2/everything"
+            params = {
+                'q': f'{company_name}',
+                'apiKey': self.news_api_key,
+                'language': 'en',
+                'sortBy': 'publishedAt',
+                'pageSize': 20,
+                'from': (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            }
+            
+            print(f"🔍 Trying News API for {symbol}...")
+            response = requests.get(url, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                news_data = response.json()
+                
+                if news_data.get('status') == 'ok':
+                    articles = news_data.get('articles', [])
+                    
+                    if len(articles) > 0:
+                        final_articles = []
+                        for article in articles[:10]:
+                            title = article.get('title', '')
+                            if title and title != '[Removed]':
+                                final_articles.append(article)
+                                if len(final_articles) >= 3:
+                                    break
+                        
+                        if len(final_articles) > 0:
+                            print(f"✅ News API: Found {len(final_articles)} articles")
+                            sentiment = analyze_news_sentiment(final_articles)
+                            
+                            return {
+                                'sentiment_score': sentiment['sentiment_score'],
+                                'articles': final_articles,
+                                'sentiment_analysis': sentiment
+                            }
+            
+            elif response.status_code == 429:
+                print(f"⏰ News API rate limited - trying alternatives...")
+            
+            return None
+            
+        except Exception as e:
+            print(f"❌ News API failed: {e}")
+            return None
+        
+    def try_alpha_vantage_news(self, symbol, company_name):
+        try:
+            api_key = "demo"
+            url = f"https://www.alphavantage.co/query"
+            params = {
+                'function': 'NEWS_SENTIMENT',
+                'tickers': symbol,
+                'apikey': api_key,
+                'limit': 10
+            }
+            
+            print(f"🔍 Trying Alpha Vantage for {symbol}...")
+            response = requests.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if 'feed' in data and len(data['feed']) > 0:
+                    articles = []
+                    for item in data['feed'][:3]:
+                        article = {
+                            'title': item.get('title', ''),
+                            'description': item.get('summary', ''),
+                            'url': item.get('url', ''),
+                            'publishedAt': item.get('time_published', ''),
+                            'source': {'name': item.get('source', 'Alpha Vantage')}
+                        }
+                        articles.append(article)
+                    
+                    print(f"✅ Alpha Vantage: Found {len(articles)} articles")
+                    sentiment = analyze_news_sentiment(articles)
+                    
+                    return {
+                        'sentiment_score': sentiment['sentiment_score'],
+                        'articles': articles,
+                        'sentiment_analysis': sentiment
+                    }
+                    
+        except Exception as e:
+            print(f"❌ Alpha Vantage failed: {e}")
+        
+        return None
+    
+    def try_yahoo_rss(self, symbol, company_name):
+        try:
+            import feedparser
+            
+            url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
+            
+            print(f"🔍 Trying Yahoo RSS for {symbol}...")
+            feed = feedparser.parse(url)
+            
+            if feed.entries and len(feed.entries) > 0:
+                articles = []
+                for entry in feed.entries[:3]:
+                    article = {
+                        'title': entry.get('title', ''),
+                        'description': entry.get('summary', ''),
+                        'url': entry.get('link', ''),
+                        'publishedAt': entry.get('published', ''),
+                        'source': {'name': 'Yahoo Finance'}
+                    }
+                    articles.append(article)
+                
+                print(f"✅ Yahoo RSS: Found {len(articles)} articles")
+                sentiment = analyze_news_sentiment(articles)
+                
+                return {
+                    'sentiment_score': sentiment['sentiment_score'],
+                    'articles': articles,
+                    'sentiment_analysis': sentiment
+                }
+                
+        except Exception as e:
+            print(f"❌ Yahoo RSS failed: {e}")
+        
+        return None
