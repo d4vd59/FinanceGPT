@@ -229,6 +229,77 @@
     </style>
 </head>
 <body>
+    <script>
+        let currentAssets = [];
+        let currentSearchTerm = '';
+        let isLoadingModal = false;
+
+        const themeToggle = document.getElementById('themeToggle');
+        const assetTypeSelect = document.getElementById('assetType');
+        const loadingDiv = document.getElementById('loading');
+        const assetGrid = document.getElementById('assetGrid');
+        const detailModal = document.getElementById('detailModal');
+        const searchInput = document.getElementById('searchInput');
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+        
+        themeToggle.onclick = () => {
+            const theme = document.body.getAttribute('data-theme');
+            const newTheme = theme === 'dark' ? 'light' : 'dark';
+            document.body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        };
+
+        function getSentimentColor(score) {
+            if (score > 0.1) return 'var(--positive)';
+            if (score < -0.1) return 'var(--negative)';
+            return 'var(--muted)';
+        }
+
+        function filterAssets(assets, searchTerm) {
+            if (!searchTerm) return assets;
+            const term = searchTerm.toLowerCase();
+            return assets.filter(asset => 
+                asset.name.toLowerCase().includes(term) || 
+                asset.symbol.toLowerCase().includes(term)
+            );
+        }
+
+        function renderAssets(assets) {
+            const filteredAssets = filterAssets(assets, currentSearchTerm);
+
+            assetGrid.innerHTML = filteredAssets.map(asset => `
+                <div class="asset-card" onclick="showAssetDetail('${asset.symbol}')">
+                    <div class="asset-header">
+                        <div class="asset-left">
+                            <div class="asset-logo" data-symbol="${asset.symbol}">
+                                ${asset.logo_url ? 
+                                    `<img src="${asset.logo_url}" alt="${asset.symbol}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                     <span style="display:none;">${asset.symbol.substring(0, 2)}</span>` :
+                                    `<span>${asset.symbol.substring(0, 2)}</span>`
+                                }
+                            </div>
+                            <div class="asset-info">
+                                <h3>${asset.name}</h3>
+                                <div class="asset-symbol">${asset.symbol}</div>
+                            </div>
+                        </div>
+                        <div class="asset-price">
+                            <div class="price">$${asset.price.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                            <div class="change ${asset.change_pct >= 0 ? 'positive' : 'negative'}">
+                                ${asset.change_pct >= 0 ? '+' : ''}${asset.change_pct.toFixed(2)}%
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+
+    </script>
     
 </body>
 </html>
