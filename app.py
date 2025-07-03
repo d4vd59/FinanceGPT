@@ -448,7 +448,7 @@ class NewsAnalyzer:
         except Exception as e:
             print(f"❌ News API failed: {e}")
             return None
-    
+        
     def try_alpha_vantage_news(self, symbol, company_name):
         try:
             api_key = "demo"
@@ -675,91 +675,3 @@ news_analyzer = NewsAnalyzer()
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@app.route('/api/assets/<asset_type>')
-def get_assets(asset_type):
-    try:
-        market_data = market_collector.get_market_data_with_cache(asset_type)
-        
-        if not market_data or not isinstance(market_data, dict):
-            raise ValueError("No valid market data received")
-        
-        assets = []
-        for symbol, data in market_data.items():
-            if data and isinstance(data, dict) and data.get('price', 0) > 0:
-                name = data.get('name', symbol)
-                truncated_name = name[:25] + ('...' if len(name) > 25 else '')
-                
-                assets.append({
-                    'symbol': symbol,
-                    'name': truncated_name,
-                    'price': round(float(data.get('price', 0)), 2),
-                    'change_pct': round(float(data.get('change_pct', 0)), 2),
-                    'market_cap': data.get('market_cap', 0),
-                    'logo_url': data.get('logo_url')
-                })
-        
-        cache_time = market_collector.stocks_cache_time if asset_type == 'stocks' else market_collector.crypto_cache_time
-        cache_age = (datetime.now() - cache_time).total_seconds() if cache_time else 0
-        
-        return jsonify({
-            'assets': assets,
-            'cache_age': int(cache_age),
-            'total_count': len(assets),
-            'status': 'success'
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'assets': [],
-            'cache_age': 0,
-            'total_count': 0,
-            'status': 'error',
-            'error': str(e)
-        }), 200
-
-@app.route('/api/asset/<symbol>')
-def get_asset_detail(symbol):
-    try:
-        print(f"🔍 Getting asset detail for {symbol}")
-        
-        market_data = market_collector.get_market_data([symbol])
-        
-        if symbol not in market_data:
-            return jsonify({'error': 'Asset not found'}), 404
-        
-        data = market_data[symbol]
-        news_data = news_analyzer.get_stock_news(symbol)
-        realistic_sentiment = get_realistic_sentiment(symbol)
-        
-        final_news = {
-            'sentiment_score': realistic_sentiment['sentiment_score'],
-            'articles': news_data['articles'],
-            'sentiment_analysis': realistic_sentiment
-        }
-        
-        market_cap = data['market_cap']
-        if market_cap:
-            if market_cap > 1e12:
-                cap_display = f"${market_cap/1e12:.2f}T"
-            elif market_cap > 1e9:
-                cap_display = f"${market_cap/1e9:.2f}B"
-            else:
-                cap_display = f"${market_cap/1e6:.2f}M"
-        else:
-            cap_display = "N/A"
-        
-        return jsonify({
-            'symbol': symbol,
-            'name': data['name'],
-            'price': round(data['price'], 2),
-            'change_pct': round(data['change_pct'], 2),
-            'market_cap_formatted': cap_display,
-            'logo_url': data['logo_url'],
-            'sentiment': realistic_sentiment,
-            'news_sentiment': final_news
-        })
-        
-    except Exception as e:
-        print(f"❌ Error in get_asset_detail: {e}")
-        return jsonify({'error': str(e)}), 500
