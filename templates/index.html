@@ -298,6 +298,30 @@
             `).join('');
         }
 
+        async function loadAssets(type = 'stocks') {
+            loadingDiv.classList.remove('hidden');
+            assetGrid.classList.add('hidden');
+            
+            try {
+                const response = await fetch(`/api/assets/${type}`);
+                const data = await response.json();
+                
+                if (data.status === 'success' && data.assets) {
+                    currentAssets = data.assets;
+                    renderAssets(currentAssets);
+                    
+                    loadingDiv.classList.add('hidden');
+                    assetGrid.classList.remove('hidden');
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
+                
+            } catch (error) {
+                loadingDiv.innerHTML = `❌ Error loading data: ${error.message}`;
+            }
+        }
+
+
 
     </script>
     
