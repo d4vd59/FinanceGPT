@@ -506,6 +506,20 @@
             }
         }
 
+        function closeModal() {
+            detailModal.classList.remove('active');
+        }
+
+        assetTypeSelect.onchange = (e) => loadAssets(e.target.value);
+        detailModal.onclick = (e) => e.target === detailModal && closeModal();
+
+        searchInput.oninput = (e) => {
+            currentSearchTerm = e.target.value;
+            renderAssets(currentAssets);
+        };
+
+        loadAssets();
+
 
 
 
