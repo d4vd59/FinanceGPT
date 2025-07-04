@@ -229,6 +229,32 @@
     </style>
 </head>
 <body>
+    <header class="header">
+        <div class="header-content">
+            <a href="/" class="logo">📈 Markets</a>
+            <div class="controls">
+                <select id="assetType">
+                    <option value="stocks">📊 Stocks</option>
+                    <option value="crypto">₿ Crypto</option>
+                </select>
+                <button class="theme-toggle" id="themeToggle">🌙</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <h1 class="title">📈 Market Overview</h1>
+        
+        <div class="search-bar">
+            <div class="search-icon">🔍</div>
+            <input type="text" id="searchInput" class="search-input" placeholder="Search assets...">
+        </div>
+        
+        <div id="loading" class="loading">Loading market data...</div>
+        <div id="assetGrid" class="asset-grid hidden"></div>
+    </main>
+
+    <div id="detailModal" class="modal"></div>
     <script>
         let currentAssets = [];
         let currentSearchTerm = '';
@@ -519,11 +545,6 @@
         };
 
         loadAssets();
-
-
-
-
-    </script>
-    
+    </script>  
 </body>
 </html>
