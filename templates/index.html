@@ -321,6 +321,192 @@
             }
         }
 
+        async function showAssetDetail(symbol) {
+            if (isLoadingModal) return;
+            isLoadingModal = true;
+            
+            try {
+                detailModal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="modal-left">
+                                <div class="modal-logo">⏳</div>
+                                <div>
+                                    <div class="modal-title">Loading ${symbol}...</div>
+                                    <div style="color: var(--muted);">Fetching AI predictions & news</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-body">
+                            <div class="metrics-grid">
+                                <div class="metric-card">
+                                    <div class="metric-value">⏳</div>
+                                    <div class="metric-label">Loading data...</div>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="close-button" onclick="closeModal()">Close</button>
+                    </div>
+                `;
+                
+                detailModal.classList.add('active');
+                
+                const [assetResponse, aiResponse] = await Promise.all([
+                    fetch(`/api/asset/${symbol}?t=${Date.now()}`),
+                    fetch(`/api/ai-prediction/${symbol}?t=${Date.now()}`)
+                ]);
+                
+                const assetData = await assetResponse.json();
+                const aiData = await aiResponse.json();
+                
+                if (assetResponse.ok && assetData.symbol === symbol) {
+                    const prediction = aiData.prediction || {};
+                    const hasValidPrediction = prediction.price_target_30d && !prediction.fallback;
+                    
+                    detailModal.innerHTML = `
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <div class="modal-left">
+                                    <div class="modal-logo">
+                                        ${assetData.logo_url ? 
+                                            `<img src="${assetData.logo_url}" alt="${assetData.symbol}" style="width:100%;height:100%;object-fit:cover;border-radius:16px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                             <span style="display:none; font-size:24px;">${assetData.symbol.substring(0, 2)}</span>` :
+                                            `<span style="font-size:24px;">${assetData.symbol.substring(0, 2)}</span>`
+                                        }
+                                    </div>
+                                    <div>
+                                        <div class="modal-title">${assetData.name}</div>
+                                        <div class="modal-symbol">${assetData.symbol}</div>
+                                    </div>
+                                </div>
+                                <div class="modal-price">
+                                    <div class="price">$${assetData.price.toFixed(2)}</div>
+                                    <div class="change ${assetData.change_pct >= 0 ? 'positive' : 'negative'}">
+                                        ${assetData.change_pct >= 0 ? '+' : ''}${assetData.change_pct.toFixed(2)}%
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="modal-body">
+                                <div class="metrics-grid">
+                                    <div class="metric-card">
+                                        <div class="metric-value">${assetData.market_cap_formatted || 'N/A'}</div>
+                                        <div class="metric-label">Market Cap</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-value" style="color: ${getSentimentColor(assetData.news_sentiment?.sentiment_score || 0)}">
+                                            ${assetData.news_sentiment?.sentiment_score || '--'}
+                                        </div>
+                                        <div class="metric-label">News Sentiment</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-value">${assetData.sentiment?.bullish_pct || '--'}%</div>
+                                        <div class="metric-label">Bullish</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-value">${prediction.confidence_30d || prediction.confidence_7d || '--'}%</div>
+                                        <div class="metric-label">AI Confidence</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="content-columns">
+                                    <div class="news-column">
+                                        <h3 class="panel-title">📰 Latest News</h3>
+                                        ${assetData.news_sentiment && assetData.news_sentiment.articles && assetData.news_sentiment.articles.length > 0 ? 
+                                            assetData.news_sentiment.articles.map(article => `
+                                                <div class="news-item">
+                                                    <a href="${article.url || '#'}" target="_blank">${article.title || 'No title'}</a>
+                                                    <small style="color: var(--muted);">
+                                                        ${article.publishedAt ? new Date(article.publishedAt).toLocaleDateString() : 'Unknown date'} - ${article.source?.name || 'Unknown source'}
+                                                    </small>
+                                                </div>
+                                            `).join('') :
+                                            `<div class="news-item">
+                                                <p style="color: var(--muted); text-align: center; padding: 2rem;">No recent news available</p>
+                                            </div>`
+                                        }
+                                    </div>
+                                    
+                                    <div class="extra-panel">
+                                        <h3 class="panel-title">🤖 AI Prediction ${prediction.powered_by ? `(${prediction.powered_by})` : ''}</h3>
+                                        
+                                        ${hasValidPrediction ? `
+                                            <div class="price-target">
+                                                <div class="target-price">$${Number(prediction.price_target_30d).toFixed(2)}</div>
+                                                <div class="target-change">30-Day Target ${prediction.price_target_30d > assetData.price ? '📈' : '📉'}</div>
+                                            </div>
+                                        ` : `
+                                            <div class="price-target" style="background: var(--muted);">
+                                                <div class="target-price">--</div>
+                                                <div class="target-change">${prediction.reasoning || 'AI Prediction Unavailable'}</div>
+                                            </div>
+                                        `}
+                                        
+                                        <div style="margin-top: 1rem;">
+                                            <div style="margin-bottom: 1rem;">
+                                                <span style="color: var(--muted);">Direction:</span>
+                                                <span style="color: ${prediction.direction === 'bullish' ? 'var(--positive)' : prediction.direction === 'bearish' ? 'var(--negative)' : 'var(--muted)'}; font-weight: 700; float: right;">${prediction.direction || 'neutral'}</span>
+                                            </div>
+                                            <div style="margin-bottom: 1rem;">
+                                                <span style="color: var(--muted);">Risk Level:</span>
+                                                <span style="color: ${prediction.risk_level === 'low' ? 'var(--positive)' : prediction.risk_level === 'high' ? 'var(--negative)' : 'var(--muted)'}; font-weight: 700; float: right;">${prediction.risk_level || 'medium'}</span>
+                                            </div>
+                                            <div>
+                                                <span style="color: var(--muted);">Recommendation:</span>
+                                                <span style="color: var(--accent); font-weight: 700; float: right;">${prediction.recommendation || 'hold'}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        ${prediction.reasoning && !prediction.fallback ? `
+                                            <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 4px solid var(--accent);">
+                                                <small style="color: var(--text);">${prediction.reasoning}</small>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        ${prediction.key_factors && prediction.key_factors.length > 0 && !prediction.fallback ? `
+                                            <h4 style="margin-top: 1.5rem; margin-bottom: 1rem; color: var(--text);">📊 Key Factors</h4>
+                                            ${prediction.key_factors.map(factor => `
+                                                <div class="tech-indicator">
+                                                    <span class="indicator-name">• ${factor}</span>
+                                                </div>
+                                            `).join('')}
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button class="close-button" onclick="closeModal()">Close</button>
+                        </div>
+                    `;
+                } else {
+                    throw new Error('Failed to load asset data');
+                }
+            } catch (error) {
+                detailModal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="modal-left">
+                                <div class="modal-logo">❌</div>
+                                <div>
+                                    <div class="modal-title">Error Loading ${symbol}</div>
+                                    <div style="color: var(--negative);">${error.message}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-body">
+                            <p style="text-align: center; color: var(--muted); padding: 2rem;">
+                                Unable to load data. Please try again later.
+                            </p>
+                        </div>
+                        <button class="close-button" onclick="closeModal()">Close</button>
+                    </div>
+                `;
+            } finally {
+                isLoadingModal = false;
+            }
+        }
+
+
 
 
     </script>
